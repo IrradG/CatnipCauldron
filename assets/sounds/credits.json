@@ -1,0 +1,27 @@
+{
+  "note": "Shown in the game's Credits window. music: one artist with the song titles (add source / url / license if you want them shown). effects: just the creators' usernames, one per sound effect or ambience file.",
+  "music": {
+    "author": "Purrple Cat",
+    "tracks": [
+      "Remembering Something I Forgot",
+      "Coffee Jelly",
+      "Turtle Sandbox"
+    ],
+    "source": "",
+    "url": "",
+    "license": ""
+  },
+  "effects": [
+    "vilkas_sound",
+    "_kwahmah_02",
+    "marevnik",
+    "odzta1",
+    "qubodup",
+    "beezlefm",
+    "f4ngy",
+    "ioan003",
+    "r0t0r",
+    "wobesound",
+    "gammagool"
+  ]
+}

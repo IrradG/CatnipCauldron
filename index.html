@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#211b35">
+  <title>Catnip Cauldron</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.26.1/full/pyodide.js"></script>
+</head>
+<body>
+  <!-- Loading screen: covers everything until Python (Pyodide) is ready. -->
+  <div id="loading-screen" class="loading-screen" role="status" aria-live="polite">
+    <div class="load-stage">
+      <div class="load-cauldron-wrap">
+        <span class="bubble b1"></span><span class="bubble b2"></span><span class="bubble b3"></span>
+        <span class="bubble b4"></span><span class="bubble b5"></span><span class="bubble b6"></span>
+        <img class="load-cauldron" src="assets/ui/CatnipCauldron%28Loading_Image%29_Trim.png" alt="" draggable="false">
+      </div>
+      <p class="load-title"><span id="load-title-text">Waking up Nyra</span><span class="dot d1">.</span><span class="dot d2">.</span><span class="dot d3">.</span></p>
+      <div class="load-bar" aria-hidden="true"><span id="load-fill" class="load-fill"></span></div>
+      <p id="load-stage-text" class="load-sub">Warming the cauldron…</p>
+      <button id="load-retry" class="menu-pill" type="button" hidden>Try again</button>
+    </div>
+  </div>
+
+
+  <main id="app">
+    <section id="main-menu" class="screen menu-screen" data-intro="wait" aria-label="Main menu">
+      <div class="menu-shade"></div>
+      <div id="menu-sparkles" class="menu-sparkles" aria-hidden="true"></div>
+      <div class="menu-content">
+        <!-- Your title artwork lives in assets/ui/. -->
+        <img class="game-title-art" src="assets/ui/CatnipCauldron%28Title%29_Trim.png" alt="Catnip Cauldron">
+        <p class="subtitle">Grow a little magic, one plant at a time.</p>
+        <div class="menu-item">
+          <button id="play-button" class="image-button play-button" type="button" aria-label="Play">
+            <span>Play</span>
+          </button>
+        </div>
+        <!-- Temporary menu buttons: they only show a "coming soon" note for now. -->
+        <div class="menu-extra">
+          <button id="settings-menu-button" class="image-button menu-button settings-btn" type="button"><span>Settings</span></button>
+          <button id="credits-menu-button" class="image-button menu-button credits-btn" type="button"><span>Credits</span></button>
+        </div>
+      </div>
+      <p id="load-status" class="load-status" role="status"></p>
+      <p class="menu-footer">A tiny garden full of wonder ♡</p>
+    </section>
+
+    <section id="garden-screen" class="screen garden-screen" data-intro="wait" aria-label="Garden" hidden>
+      <!-- The planting-area pictures for each time of day and weather; main.js fades between them. -->
+      <div class="scene-stack" aria-hidden="true">
+        <div class="scene" data-scene="day"></div>
+        <div class="scene" data-scene="night"></div>
+        <div class="scene" data-scene="starry"></div>
+        <div class="scene" data-scene="rain"></div>
+      </div>
+      <!-- Easter egg (SECTION 21): in the garden the dark falls over the garden but under Nyra, so she stays bright. -->
+      <div id="garden-veil" class="garden-veil" aria-hidden="true"></div>
+      <!-- Weather effects: rain falls when it rains, fireflies drift on clear or cloudy nights (built in main.js). -->
+      <div id="weather-fx" class="weather-fx" data-fx="none" aria-hidden="true">
+        <div id="fx-rain" class="fx-layer fx-rain"></div>
+        <div id="fx-fireflies" class="fx-layer fx-fireflies"></div>
+      </div>
+      <!-- Level-up celebration (SECTION 18 in main.js): sparkles burst out and a card says what just unlocked. -->
+      <div id="levelup-layer" class="levelup-layer" hidden>
+        <div class="levelup-rays" aria-hidden="true"></div>
+        <div id="levelup-card" class="levelup-card" role="status" aria-live="polite">
+          <div class="levelup-title">LEVEL UP!</div>
+          <div class="levelup-badge" aria-hidden="true"><span id="levelup-number">2</span></div>
+          <div id="levelup-unlocks" class="levelup-unlocks"></div>
+          <small class="levelup-hint">Click to continue</small>
+        </div>
+        <div id="levelup-particles" class="levelup-particles" aria-hidden="true"></div>
+      </div>
+      <header class="top-bar">
+        <div class="top-group">
+          <div id="day-indicator" class="day-indicator"><span id="time-icon" aria-hidden="true">☀</span> <span id="day-label">Day 1</span><span id="weather-label" class="weather-label"></span></div>
+          <button id="skip-time-button" class="top-button" type="button" title="Skip to night">Skip Time ›</button>
+          <button id="undo-button" class="top-button" type="button" disabled title="Nothing to undo">↶ Undo</button>
+        </div>
+        <div class="top-group">
+          <div id="level-pill" class="resource-pill level-pill" role="img" aria-label="Level 1"><span id="level-label">Lv 1</span><span class="level-bar" aria-hidden="true"><i id="level-fill"></i></span></div>
+          <div class="resource-pill">Coins: <strong id="coin-count" class="coin-count">0</strong></div>
+          <div class="resource-pill"><span id="seed-label">Seeds</span>: <strong id="seed-count">0</strong></div>
+        </div>
+      </header>
+
+      <!-- Grid is positioned directly over the dirt patch in your background art. -->
+      <div id="garden-grid" class="garden-grid" aria-label="Five by five garden grid"></div>
+
+      <!-- Nyra is free-standing over the scene, not inside a card. -->
+      <aside class="nyra-area" aria-label="Nyra">
+        <img id="nyra-sprite" class="nyra-sprite" alt="Nyra, your cat-witch companion">
+        <!-- Clicking Nyra works with the mouse (see SECTION 17); this button is the keyboard way to say hi. -->
+        <button id="nyra-pat" class="nyra-hitbox" type="button" aria-label="Say hi to Nyra"></button>
+      </aside>
+
+      <!-- Dock on the right edge: [main icons] [extra icons] [arrow tab].
+           Opening the arrow grows the extras column, which pushes the main icons left. -->
+      <div id="dock" class="dock">
+        <!-- Plant picker: pops out from behind the main icons when the Border icon is pressed. -->
+        <div class="panel-clip">
+          <aside id="plant-drawer" class="drawer-panel" aria-label="Plant menu" aria-hidden="true">
+            <img class="drawer-art" src="assets/ui/CatnipCauldron_Vertical%20UI.png" alt="" aria-hidden="true">
+            <div class="drawer-content">
+              <h2>Choose a Plant</h2>
+              <div id="plant-list" class="plant-list" aria-label="Available plants"></div>
+            </div>
+          </aside>
+        </div>
+
+        <nav id="icon-rail" class="icon-rail" aria-label="Garden actions">
+          <!-- The Border icon shows the plant you currently have equipped. -->
+          <button id="border-button" class="icon-button" type="button" aria-label="Equipped plant. Open plant menu" aria-expanded="false" aria-controls="plant-drawer" title="Choose plant">
+            <img class="icon-art" src="assets/ui/CatnipCauldron_IconImage%28Border%29.png" alt="" draggable="false">
+            <img id="equipped-plant" class="equipped-plant" alt="" draggable="false">
+          </button>
+          <button id="plant-button" class="icon-button" type="button" aria-label="Plant" title="Plant">
+            <img class="icon-art" src="assets/ui/CatnipCauldron_IconImage%28Plant%29.png" alt="" draggable="false">
+          </button>
+          <button id="harvest-button" class="icon-button" type="button" aria-label="Harvest" title="Harvest">
+            <img class="icon-art" src="assets/ui/CatnipCauldron_IconImage%28Harvest%29.png" alt="" draggable="false">
+          </button>
+          <button id="remove-button" class="icon-button" type="button" aria-label="Remove" title="Remove">
+            <img class="icon-art" src="assets/ui/CatnipCauldron_IconImage%28Remove%29.png" alt="" draggable="false">
+          </button>
+        </nav>
+
+        <div id="extras" class="extras" aria-hidden="true">
+          <nav class="extras-inner" aria-label="More buttons">
+            <button id="shop-button" class="icon-button" type="button" aria-label="Shop" title="Shop">
+              <img class="icon-art" src="assets/ui/CatnipCauldron_IconImage%28Shop%29.png" alt="" draggable="false">
+            </button>
+            <button id="backpack-button" class="icon-button" type="button" aria-label="Backpack" title="Backpack">
+              <img class="icon-art" src="assets/ui/CatnipCauldron_IconImage%28Backpack%29.png" alt="" draggable="false">
+            </button>
+            <button id="herbarium-button" class="icon-button" type="button" aria-label="Herbarium" title="Herbarium">
+              <img class="icon-art" src="assets/ui/CatnipCauldron_IconImage%28Herbarium%29.png" alt="" draggable="false">
+            </button>
+            <button id="map-button" class="icon-button" type="button" aria-label="Map" title="Map">
+              <img class="icon-art" src="assets/ui/CatnipCauldron_IconImage%28Map%29.png" alt="" draggable="false">
+            </button>
+            <button id="cauldron-button" class="icon-button" type="button" aria-label="Cauldron" title="Cauldron">
+              <img class="icon-art" src="assets/ui/CatnipCauldron_IconImage%28Cauldron%29.png" alt="" draggable="false">
+            </button>
+            <button id="settings-button" class="icon-button" type="button" aria-label="Settings" title="Settings">
+              <img class="icon-art" src="assets/ui/CatnipCauldron_IconImage%28Settings%29.png" alt="" draggable="false">
+            </button>
+            <button id="menu-button" class="icon-button" type="button" aria-label="Back to main menu" title="Menu">
+              <img class="icon-art" src="assets/ui/CatnipCauldron_IconImage%28Leave%29.png" alt="" draggable="false">
+            </button>
+          </nav>
+        </div>
+
+        <button id="dock-tab" class="dock-tab" type="button" aria-label="Show more buttons" aria-expanded="false" aria-controls="extras">
+          <span class="tab-arrow" aria-hidden="true"></span>
+        </button>
+      </div>
+
+      <!-- Dialogue art stays hidden until Nyra has something to say. -->
+      <section id="dialogue-panel" class="dialogue-panel" aria-live="polite" role="button" tabindex="0" aria-label="Dismiss dialogue" hidden>
+        <img class="dialogue-box-art" src="assets/ui/CatnipCauldron_DialogueBox_Trim.png" alt="" aria-hidden="true">
+        <div class="dialogue-copy">
+          <p id="dialogue-text"></p>
+        </div>
+      </section>
+
+      <!-- Backpack: the closed bag slides in, opens, and the inventory panel rises out of it. -->
+      <div id="inventory" class="inventory" hidden>
+        <div id="inv-scrim" class="inv-scrim"></div>
+        <div id="inv-bag" class="inv-bag" aria-hidden="true">
+          <div id="inv-bag-hop" class="inv-bag-hop">
+            <img class="bag-closed" src="assets/ui/CatnipCauldron_Backpack%28Closed%29.png" alt="" draggable="false">
+            <img class="bag-open" src="assets/ui/CatnipCauldron_Backpack%28Open%29.png" alt="" draggable="false">
+          </div>
+        </div>
+        <section id="inv-panel" class="inv-panel" role="dialog" aria-modal="true" aria-labelledby="inv-title">
+          <header class="inv-header">
+            <h2 id="inv-title">Backpack</h2>
+            <button id="inv-close" class="inv-close" type="button" aria-label="Close backpack"><span aria-hidden="true"></span></button>
+          </header>
+          <div class="inv-tabs" role="tablist" aria-label="Backpack sections">
+            <button class="inv-tab selected" type="button" role="tab" aria-selected="true" data-tab="seeds">Seeds</button>
+            <button class="inv-tab" type="button" role="tab" aria-selected="false" data-tab="plants">Plants</button>
+            <button class="inv-tab" type="button" role="tab" aria-selected="false" data-tab="potions">Potions</button>
+            <button id="inv-peek" class="inv-peek" type="button" aria-pressed="false" title="See how the backpack is stored (hash table)">Peek inside</button>
+          </div>
+          <div class="sortrow inv-sortrow">
+            <label>Sort by <select id="inv-sort-field"><option value="name">Name</option><option value="count">Count</option></select></label>
+            <label>Method <select id="inv-sort-algo" class="sort-algo"></select></label>
+            <button id="inv-sort-dir" class="sort-dir" type="button" aria-label="Sort ascending" title="Ascending">↑</button>
+          </div>
+          <div id="inv-grid" class="inv-grid" role="list" aria-label="Items"></div>
+          <div id="inv-peek-view" class="inv-peek-view" hidden></div>
+          <p id="inv-hint" class="inv-hint"></p>
+        </section>
+      </div>
+
+      <!-- Herbarium: your collection book. Left page = contents + search, right page = the entry. -->
+      <div id="herbarium" class="herbarium" hidden>
+        <div id="herb-scrim" class="inv-scrim"></div>
+        <div id="herb-book" class="herb-book" role="dialog" aria-modal="true" aria-labelledby="herb-title">
+          <img class="herb-art" src="assets/ui/CatnipCauldron_Herbarium%28UI%29.png" alt="" draggable="false">
+          <section class="herb-page herb-left">
+            <header class="herb-head"><h2 id="herb-title">Herbarium</h2><span id="herb-progress" class="herb-progress"></span></header>
+            <div class="herb-search">
+              <input id="herb-query" type="search" placeholder="Search by name…" aria-label="Search the Herbarium" autocomplete="off">
+              <select id="herb-method" aria-label="Search method"></select>
+              <button id="herb-go" class="herb-go" type="button">Search</button>
+            </div>
+            <p id="herb-search-result" class="herb-search-result" role="status"></p>
+            <label class="herb-order">Order
+              <select id="herb-order">
+                <option value="dfs">Depth-first (tree)</option>
+                <option value="bfs">Breadth-first (tree)</option>
+                <option value="az">A–Z (search tree)</option>
+              </select>
+            </label>
+            <p id="herb-note" class="herb-note"></p>
+            <div id="herb-list" class="herb-list" role="list" aria-label="Herbarium entries"></div>
+          </section>
+          <section class="herb-page herb-right"><div id="herb-detail" class="herb-detail" aria-live="polite"></div></section>
+          <button id="herb-close" class="inv-close herb-close" type="button" aria-label="Close Herbarium"><span aria-hidden="true"></span></button>
+        </div>
+      </div>
+
+      <!-- Map (Lesson 7): places joined by paths. Explore with a queue (breadth-first) or a stack (depth-first). -->
+      <div id="map-layer" class="map-layer" hidden>
+        <div id="map-scrim" class="inv-scrim"></div>
+        <section id="map-panel" class="map-panel" role="dialog" aria-modal="true" aria-labelledby="map-title">
+          <header class="map-head">
+            <h2 id="map-title">Map</h2>
+            <span id="map-progress" class="map-progress"></span>
+            <button id="map-close" class="inv-close" type="button" aria-label="Close Map"><span aria-hidden="true"></span></button>
+          </header>
+          <div class="map-body">
+            <svg id="map-svg" class="map-svg" viewBox="0 0 100 100" role="group" aria-label="Map of places"></svg>
+            <div class="map-side">
+              <div class="map-controls">
+                <label>Walk
+                  <select id="map-mode">
+                    <option value="bfs">Breadth-first (queue)</option>
+                    <option value="dfs">Depth-first (stack)</option>
+                  </select>
+                </label>
+                <button id="map-explore" class="herb-go" type="button">Explore!</button>
+              </div>
+              <p id="map-note" class="map-note"></p>
+              <p id="map-message" class="map-message" role="status"></p>
+              <div id="map-detail" class="map-detail" aria-live="polite"></div>
+              <div class="map-travel">
+                <h3 class="map-subhead">Travel <small>(minutes on each path count!)</small></h3>
+                <div class="map-travel-buttons">
+                  <button id="map-route" class="herb-go" type="button">Cheapest way there</button>
+                  <button id="map-errands" class="herb-go" type="button">Errand trip</button>
+                </div>
+                <div id="map-route-result" class="map-result" aria-live="polite"></div>
+                <div id="map-trip-result" class="map-result" aria-live="polite"></div>
+              </div>
+              <details class="map-order">
+                <summary>Visiting order <small id="map-structure"></small></summary>
+                <ol id="map-steps" class="map-steps"></ol>
+              </details>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- Cauldron: the garden blurs, the big cauldron rises from the bottom, panels slide in from both sides. -->
+      <div id="cauldron-layer" class="map-layer cauldron-layer" hidden>
+        <div id="cauldron-scrim" class="inv-scrim"></div>
+        <div id="cauldron-panel" class="cauldron-ui" role="dialog" aria-modal="true" aria-labelledby="cauldron-title">
+          <header class="cauldron-head">
+            <h2 id="cauldron-title">Cauldron</h2>
+            <span id="cauldron-weather" class="map-progress"></span>
+            <button id="cauldron-close" class="inv-close" type="button" aria-label="Close Cauldron"><span aria-hidden="true"></span></button>
+          </header>
+          <p id="cauldron-demand" class="cauldron-demand"></p>
+
+          <aside class="cauldron-side cauldron-left" aria-label="Nyra's advice">
+            <div class="cauldron-actions">
+              <button id="cauldron-ask" class="herb-go" type="button">Ask Nyra</button>
+              <button id="cauldron-plan" class="herb-go" type="button">Brew Nyra's plan</button>
+            </div>
+            <p id="cauldron-message" class="map-message" role="status"></p>
+            <div id="cauldron-advice" class="map-result" aria-live="polite"></div>
+          </aside>
+
+          <div class="pot-stage">
+            <div id="pot-wrap" class="pot-wrap">
+              <span class="bubble b1"></span><span class="bubble b2"></span><span class="bubble b3"></span>
+              <span class="bubble b4"></span><span class="bubble b5"></span><span class="bubble b6"></span>
+              <img id="pot-art" class="pot-art" src="assets/ui/CatnipCauldron%28Cauldron_Main%29_Trim.png" alt="" draggable="false">
+              <div id="pot-result" class="pot-result" hidden><img alt=""><strong></strong><small></small></div>
+            </div>
+          </div>
+
+          <aside class="cauldron-side cauldron-right" aria-label="Recipes">
+            <div id="cauldron-recipes" class="cauldron-recipes" role="list"></div>
+          </aside>
+        </div>
+      </div>
+
+      <p id="garden-message" class="visually-hidden" aria-live="polite"></p>
+    </section>
+
+    <!-- Shop: sells seeds, buys harvested plants. Reached from the extra buttons in the garden. -->
+    <section id="shop-screen" class="screen shop-screen" data-intro="wait" aria-label="Shop" hidden>
+      <div class="shop-shade"></div>
+      <header class="top-bar">
+        <div class="top-group">
+          <button id="shop-back-button" class="image-button back-art" type="button" aria-label="Back to the garden"><span>Garden</span></button>
+        </div>
+        <div class="top-group">
+          <div class="resource-pill">Coins: <strong class="coin-count">0</strong></div>
+        </div>
+      </header>
+      <section class="shop-panel" aria-labelledby="shop-title">
+        <header class="shop-header">
+          <h2 id="shop-title">Shop</h2>
+          <div class="inv-tabs" role="tablist" aria-label="Shop sections">
+            <button class="inv-tab selected" type="button" role="tab" aria-selected="true" data-shop-tab="buy">Buy seeds</button>
+            <button class="inv-tab" type="button" role="tab" aria-selected="false" data-shop-tab="sell">Sell</button>
+          </div>
+        </header>
+        <div class="sortrow">
+          <label>Sort by
+            <select id="shop-sort-field"><option value="name">Name</option><option value="price">Price</option><option value="owned">Owned</option></select>
+          </label>
+          <label>Method <select id="shop-sort-algo" class="sort-algo"></select></label>
+          <button id="shop-sort-dir" class="sort-dir" type="button" aria-label="Sort ascending" title="Ascending">↑</button>
+        </div>
+        <div id="shop-list" class="shop-list" role="list"></div>
+        <p id="shop-sort-info" class="sort-info"></p>
+        <p id="shop-note" class="shop-note" role="status"></p>
+      </section>
+    </section>
+
+    <!-- Settings and Credits (SECTION 20 in main.js). Reachable from the home screen and from the garden. -->
+    <div id="dialog-layer" class="dialog-layer" hidden>
+      <div id="dialog-scrim" class="dialog-scrim"></div>
+      <section id="settings-panel" class="dialog-panel" role="dialog" aria-modal="true" aria-labelledby="settings-title" hidden>
+        <header class="map-head">
+          <h2 id="settings-title">Settings</h2>
+          <button id="settings-close" class="inv-close" type="button" aria-label="Close Settings"><span aria-hidden="true"></span></button>
+        </header>
+        <div class="dialog-body">
+          <label class="setting-row" for="music-volume"><span>Music</span>
+            <input id="music-volume" type="range" min="0" max="100" step="5" value="50"><output id="music-volume-out" for="music-volume">50%</output></label>
+          <label class="setting-row" for="effects-volume"><span>Sound effects</span>
+            <input id="effects-volume" type="range" min="0" max="100" step="5" value="80"><output id="effects-volume-out" for="effects-volume">80%</output></label>
+          <label class="setting-check"><input id="sound-mute" type="checkbox"> Mute everything <small>(shortcut: M)</small></label>
+          <p class="setting-note" aria-live="polite">Now playing: <span id="now-playing">—</span></p>
+          <div class="secret-box">
+            <label class="secret-row" for="secret-code"><span>Secret code</span>
+              <input id="secret-code" type="text" maxlength="24" placeholder="Type a code…" autocomplete="off" autocapitalize="characters" spellcheck="false">
+              <button id="secret-go" class="herb-go" type="button">Enter</button>
+            </label>
+            <p id="secret-result" class="secret-result" role="status" aria-live="polite"></p>
+          </div>
+          <button id="open-credits" class="herb-go" type="button">Credits</button>
+        </div>
+      </section>
+      <section id="credits-panel" class="dialog-panel" role="dialog" aria-modal="true" aria-labelledby="credits-title" hidden>
+        <header class="map-head">
+          <h2 id="credits-title">Credits</h2>
+          <button id="credits-close" class="inv-close" type="button" aria-label="Close Credits"><span aria-hidden="true"></span></button>
+        </header>
+        <div class="dialog-body">
+          <p class="setting-note">All the artwork, Nyra and the game itself were made by the game's creator. Python runs in your browser thanks to Pyodide.</p>
+          <div id="credits-list" class="credits-list"><p class="credit-line">Loading…</p></div>
+          <button id="credits-back" class="herb-go" type="button">Back to Settings</button>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- The hidden easter egg (SECTION 21 in main.js): a dark veil, Nyra's voice, and the rhythm-game fight in a frame. -->
+  <div id="egg-layer" class="egg-layer" hidden>
+    <iframe id="egg-frame" class="egg-frame" title="Easter egg" allow="autoplay" tabindex="-1"></iframe>
+    <div id="egg-veil" class="egg-veil"></div>
+    <div id="egg-nyra" class="egg-nyra" hidden>
+      <img id="egg-nyra-sprite" class="egg-nyra-sprite" alt="Nyra">
+      <section id="egg-dialogue" class="egg-dialogue" role="button" tabindex="0" aria-live="polite" aria-label="Nyra is speaking. Click to continue">
+        <img class="dialogue-box-art" src="assets/ui/CatnipCauldron_DialogueBox_Trim.png" alt="" aria-hidden="true">
+        <div class="dialogue-copy"><p id="egg-dialogue-text"></p></div>
+      </section>
+    </div>
+  </div>
+  <script src="js/nyra.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
